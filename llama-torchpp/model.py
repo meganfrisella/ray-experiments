@@ -3,6 +3,7 @@
 
 import logging
 import math
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
@@ -348,6 +349,10 @@ class Transformer(nn.Module):
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
 
+        self.fwd_time = 0
+        self.events: Dict[str, Any] = {}
+        self.elapses: Dict[str, List] = defaultdict(list)
+
         # buckets = [
         #     "VocabParallelEmbedding",
         #     [
@@ -400,9 +405,64 @@ class Transformer(nn.Module):
             params.rope_theta,
         )
 
+    def init_tracing(self):
+    #   self.num_batches_forwarded = 0
+    #   self.num_batches_updated = 0
+      self.events: Dict[str, Any] = {
+          "start": [],
+          "end": [],
+          "fwd.starts": [],
+          "fwd.ends": [],
+          "bwd.starts": [],
+          "bwd.ends": [],
+          "upd.starts": [],
+          "upd.ends": [],
+      }
+      torch.cuda.synchronize()
+
+    def fetch_traces(self) -> Dict[str, List[float]]:
+        return self.elapses
+
+    def update_tracing(self, key: str):
+        event = torch.cuda.Event(enable_timing=True)
+        event.record()
+        assert key in self.events
+        self.events[key].append(event)
+
+    def finish_tracing(self) -> None:
+        torch.cuda.synchronize()
+
+        assert len(self.events["start"]) == 1
+        assert len(self.events["end"]) == 1
+
+        def millis_to_micros(millis: float) -> int:
+            return round(millis * 1e3)
+
+        total = self.events["start"][0].elapsed_time(self.events["end"][0])
+        fw_total = sum(
+            [
+                fw_start.elapsed_time(fw_end)
+                for fw_start, fw_end in zip(
+                    self.events["fwd.starts"],
+                    self.events["fwd.ends"],
+                )
+            ]
+        )
+        print("fw elapses: ",             [
+                fw_start.elapsed_time(fw_end)
+                for fw_start, fw_end in zip(
+                    self.events["fwd.starts"],
+                    self.events["fwd.ends"],
+                )
+            ])
+        self.elapses["total"].append(millis_to_micros(total))
+        self.elapses["fwd_total"].append(millis_to_micros(fw_total))
+
     def forward(self, tokens: torch.TensorType):
-        _bsz, seqlen = tokens.shape
-        h = self.tok_embeddings(tokens)
+        self.update_tracing("fwd.starts")
+
+        seqlen = tokens.shape[1]
+        h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
         # self.freqs_cis = self.freqs_cis.to(h.device)
         start_pos = 0
@@ -424,6 +484,8 @@ class Transformer(nn.Module):
 
         for layer in self.layers:
             h = layer(h, start_pos, freqs_cis, mask)
-        h = self.norm(h)
-        output = self.output(h).float()
+        h = self.norm(h) if self.norm else h
+        output = self.output(h).float() if self.output else h
+
+        self.update_tracing("fwd.ends")
         return output

@@ -21,12 +21,22 @@ def parse_args() -> Dict[str, Any]:
         type=int,
     )
     parser.add_argument(
-        "--num-partitions",
+        "--num-iters",
         type=int,
     )
     parser.add_argument(
-        "--num-iters",
-        type=int,
+        "--model",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--output-path",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--timestamp",
+        type=str,
         required=True,
     )
     args = parser.parse_args()
