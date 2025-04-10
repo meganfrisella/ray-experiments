@@ -28,11 +28,11 @@ rm -r ${output_path}/*.csv
 rm -f ${output_path}/*.json
 echo "Running $output_path..."
 
-nproc_per_node=2
+nproc_per_node=3
 batch_size=128
 seq_len=32
 num_microbatches=2
-num_iters=25
+num_iters=5
 model=LLAMA_DEBUG
 
 # RAY_CGRAPH_VISUALIZE_SCHEDULE=1 \

@@ -31,7 +31,7 @@ def log_to_csv(output_path, timestamp, rank, elapses, warmup: float=0.2):
 def train(rank, world_size, device, model_args, output_path, timestamp, batch_size=100, seq_len=10, num_iters=2, num_batches=10, num_microbatches=4):
 
     # load model
-    model = Transformer(rank, model_args)
+    model = Transformer(rank, device, model_args)
     print(f"[Rank {rank}] Loaded model")
 
     # create pipeline
