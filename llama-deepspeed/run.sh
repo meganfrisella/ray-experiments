@@ -28,22 +28,15 @@ rm -r ${output_path}/*.csv
 rm -f ${output_path}/*.json
 echo "Running $output_path..."
 
-nproc_per_node=2
-batch_size=128
-seq_len=32
+stages=2
+batch_size=32
+seq_len=16
 num_microbatches=2
-num_iters=25
+num_iters=10
 model=LLAMA_DEBUG
 
 # RAY_CGRAPH_VISUALIZE_SCHEDULE=1 \
-torchrun --nnodes 1 --nproc-per-node $nproc_per_node train-pippy-manual.py \
-  --num-iters $num_iters \
-	--seq-len $seq_len \
-	--batch-size $batch_size \
-  --num-microbatches $num_microbatches \
-  --model $model \
-	--output-path $output_path \
-	--timestamp $timestamp
+deepspeed train.py --deepspeed_config=config.json -p $stages -s $num_iters -b $batch_size --seq-len $seq_len
 	#>$log_file 2>&1
 # --save-model \
 status=$?

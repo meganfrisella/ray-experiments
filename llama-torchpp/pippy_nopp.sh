@@ -20,7 +20,7 @@ export TZ="America/Los_Angeles"
 timestamp=$(date '+%Y%m%d_%H%M%S')
 
 export RAY_DEDUP_LOGS=0
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=0,2,3
 
 output_path=results/mfris/
 mkdir -p $output_path
@@ -32,11 +32,11 @@ nproc_per_node=2
 batch_size=128
 seq_len=32
 num_microbatches=2
-num_iters=25
-model=LLAMA_DEBUG
+num_iters=10
+model=LLAMA_1B
 
 # RAY_CGRAPH_VISUALIZE_SCHEDULE=1 \
-torchrun --nnodes 1 --nproc-per-node $nproc_per_node train-pippy-manual.py \
+python3 train-pippy-nopp.py \
   --num-iters $num_iters \
 	--seq-len $seq_len \
 	--batch-size $batch_size \

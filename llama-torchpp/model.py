@@ -14,6 +14,8 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn.utils import parameters_to_vector
 
+from torch.profiler import profile, record_function, ProfilerActivity
+
 # import fairscale.nn.model_parallel.initialize as fs_init
 # from fairscale.nn.model_parallel.layers import (
 #     ColumnParallelLinear,
@@ -343,8 +345,9 @@ class TransformerBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, params: ModelArgs):
+    def __init__(self, rank, params: ModelArgs):
         super().__init__()
+        self.rank = rank
         self.params = params
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
@@ -448,19 +451,20 @@ class Transformer(nn.Module):
                 )
             ]
         )
-        print("fw elapses: ",             [
-                fw_start.elapsed_time(fw_end)
-                for fw_start, fw_end in zip(
-                    self.events["fwd.starts"],
-                    self.events["fwd.ends"],
-                )
-            ])
+        # print("fw elapses: ",             [
+        #         fw_start.elapsed_time(fw_end)
+        #         for fw_start, fw_end in zip(
+        #             self.events["fwd.starts"],
+        #             self.events["fwd.ends"],
+        #         )
+        #     ])
         self.elapses["total"].append(millis_to_micros(total))
         self.elapses["fwd_total"].append(millis_to_micros(fw_total))
 
     def forward(self, tokens: torch.TensorType):
+        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True) as prof:
+        #     with record_function(f"Rank {self.rank}"):
         self.update_tracing("fwd.starts")
-
         seqlen = tokens.shape[1]
         h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
@@ -482,10 +486,14 @@ class Transformer(nn.Module):
                 [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
             ).type_as(h)
 
-        for layer in self.layers:
+        for layer in self.layers[:len(self.layers)//2]:
             h = layer(h, start_pos, freqs_cis, mask)
         h = self.norm(h) if self.norm else h
         output = self.output(h).float() if self.output else h
 
         self.update_tracing("fwd.ends")
+        torch.cuda.synchronize()
+        print(f"Rank {self.rank}fwd: {(self.events['fwd.starts'][-1]).elapsed_time(self.events['fwd.ends'][-1])}")
+        # print(f"Rank {self.rank}:\n", prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+        # prof.export_chrome_trace("results/mfris/" + f"trace_rank{self.rank}.json")
         return output
