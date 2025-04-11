@@ -348,6 +348,7 @@ class Transformer(nn.Module):
     def __init__(self, rank, device, params: ModelArgs):
         super().__init__()
         self.rank = rank
+        self.device = device
         self.params = params
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
@@ -464,6 +465,8 @@ class Transformer(nn.Module):
         self.elapses["fwd_total"].append(millis_to_micros(fw_total))
 
     def forward(self, tokens: torch.TensorType):
+        # check that inputs are on the expected device
+        print(f"RANK {self.rank}", torch.cuda.is_available(), torch.cuda.device_count(), self.device, tokens.device)
         with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True) as prof:
             with record_function(f"Rank {self.rank}"):
                 self.update_tracing("fwd.starts")
@@ -497,6 +500,6 @@ class Transformer(nn.Module):
                 # torch.cuda.synchronize()
                 # time = (self.events['fwd.starts'][-1]).elapsed_time(self.events['fwd.ends'][-1])
                 # print(f"Rank {self.rank} fwd: {time}")
-        print(f"Rank {self.rank}:\n", prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+        # print(f"Rank {self.rank}:\n", prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
         prof.export_chrome_trace("results/mfris/" + f"trace_rank{self.rank}.json")
         return output
