@@ -20,7 +20,7 @@ export TZ="America/Los_Angeles"
 timestamp=$(date '+%Y%m%d_%H%M%S')
 
 export RAY_DEDUP_LOGS=0
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 output_path=results/mfris/
 mkdir -p $output_path
@@ -28,12 +28,14 @@ rm -r ${output_path}/*.csv
 rm -f ${output_path}/*.json
 echo "Running $output_path..."
 
-nproc_per_node=3
+rm my_trace.nsys-rep
+
+nproc_per_node=4
 batch_size=128
 seq_len=32
 num_microbatches=2
-num_iters=5
-model=LLAMA_DEBUG
+num_iters=25
+model=LLAMA_3B
 
 # RAY_CGRAPH_VISUALIZE_SCHEDULE=1 \
 torchrun --nnodes 1 --nproc-per-node $nproc_per_node train-pippy-manual.py \

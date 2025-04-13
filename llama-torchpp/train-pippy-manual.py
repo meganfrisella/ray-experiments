@@ -31,26 +31,20 @@ def log_to_csv(output_path, timestamp, rank, elapses, warmup: float=0.2):
 def train(rank, world_size, device, model_args, output_path, timestamp, batch_size=100, seq_len=10, num_iters=2, num_batches=10, num_microbatches=4):
 
     # load model
-    model = Transformer(rank, device, model_args)
+    layers_per_rank = model_args.n_layers // world_size
+    model = Transformer(rank, layers_per_rank, device, model_args)
     print(f"[Rank {rank}] Loaded model")
 
     # create pipeline
-    layers_per_rank = model_args.n_layers // world_size
     if rank == 0:
-        for _ in range(layers_per_rank):
-            del model.layers[0]
         model.norm = None
         model.output = None
     elif rank == world_size - 1:
         model.tok_embeddings = None
-        for _ in range(layers_per_rank):
-            del model.layers[layers_per_rank]
     else:
         model.norm = None
         model.output = None
         model.tok_embeddings = None
-        for _ in range(layers_per_rank):
-            del model.layers[layers_per_rank]
 
     stage = PipelineStage(
         model,
