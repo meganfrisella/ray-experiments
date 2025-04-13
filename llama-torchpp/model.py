@@ -348,6 +348,7 @@ class Transformer(nn.Module):
     def __init__(self, rank, layers_per_rank, device, params: ModelArgs):
         super().__init__()
         self.rank = rank
+        self.device = device
         self.params = params
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
