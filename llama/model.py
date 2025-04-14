@@ -416,6 +416,10 @@ class Transformer(nn.Module):
           "end": [],
           "fwd.starts": [],
           "fwd.ends": [],
+          "stg1.starts": [],
+          "stg1.ends": [],
+          "stg2.starts": [],
+          "stg2.ends": [],
           "bwd.starts": [],
           "bwd.ends": [],
           "upd.starts": [],
@@ -453,22 +457,36 @@ class Transformer(nn.Module):
                 )
             ]
         )
+        stg1_total = sum(
+            [
+                fw_start.elapsed_time(fw_end)
+                for fw_start, fw_end in zip(
+                    self.events["stg1.starts"],
+                    self.events["stg1.ends"],
+                )
+            ]
+        )
+        stg2_total = sum(
+            [
+                fw_start.elapsed_time(fw_end)
+                for fw_start, fw_end in zip(
+                    self.events["stg2.starts"],
+                    self.events["stg2.ends"],
+                )
+            ]
+        )
         # check the time between forward calls
-        
-        # print("fw elapses: ",             [
-        #         fw_start.elapsed_time(fw_end)
-        #         for fw_start, fw_end in zip(
-        #             self.events["fwd.starts"],
-        #             self.events["fwd.ends"],
-        #         )
-        #     ])
+
         self.elapses["total"].append(millis_to_micros(total))
         self.elapses["fwd_total"].append(millis_to_micros(fw_total))
+        self.elapses["stg1_total"].append(millis_to_micros(stg1_total))
+        self.elapses["stg2_total"].append(millis_to_micros(stg2_total))
 
     def forward(self, tokens: torch.TensorType):
         # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True) as prof:
         #     with record_function(f"Rank {self.rank}"):
         self.update_tracing("fwd.starts")
+        self.update_tracing("stg1.starts")
         seqlen = tokens.shape[1]
         h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
@@ -490,11 +508,18 @@ class Transformer(nn.Module):
                 [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
             ).type_as(h)
 
-        for layer in self.layers:
+        for layer in self.layers[:len(self.layers)//2]:
+            h = layer(h, start_pos, freqs_cis, mask)
+
+        self.update_tracing("stg1.ends")
+        self.update_tracing("stg2.starts")
+
+        for layer in self.layers[len(self.layers)//2:]:
             h = layer(h, start_pos, freqs_cis, mask)
         h = self.norm(h) if self.norm else h
         output = self.output(h).float() if self.output else h
 
+        self.update_tracing("stg2.ends")
         self.update_tracing("fwd.ends")
         # torch.cuda.synchronize()
         # time = (self.events['fwd.starts'][-1]).elapsed_time(self.events['fwd.ends'][-1])
