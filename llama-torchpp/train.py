@@ -32,9 +32,11 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     assert world_size == 2
 
     # load model
+
     layers_per_rank = model_args.n_layers // world_size
-    if rank == 0: layers_per_rank += 1
-    if rank == 1: layers_per_rank -= 1
+    if rank == 0: int(model_args.n_layers * 5 / 8)
+    if rank == 1: model_args.n_layers - int(model_args.n_layers * 5 / 8)
+
     model = Transformer(rank, layers_per_rank, device, model_args)
     print(f"[Rank {rank}] Loaded model")
 
