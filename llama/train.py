@@ -12,13 +12,19 @@ from typing import Any, Dict
 # load model
 
 model_args = LLAMA_DEBUG
+batch_size = 128
+seq_len = 32
+num_iters = 25
+
 device = "cuda:0"
-model = Transformer(device, model_args)
+stg1_layers = int(model_args.n_layers * 5 / 8)
+print(f"stg 1: {stg1_layers}/{model_args.n_layers} layers")
+model = Transformer(device, model_args, stg1_layers)
 model.to(device)
+print("loaded model")
 
 # generate data
 
-batch_size, seq_len = 128, 32
 input = torch.randint(
     0,
     model_args.vocab_size,
@@ -38,7 +44,8 @@ target = torch.randn(
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-6)
 
-for iter in range(10):
+for iter in range(num_iters):
+    if iter % 5 == 0: print(f"iter {iter}/{num_iters}")
     model.init_tracing()
     model.update_tracing("start")
     # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True) as prof:

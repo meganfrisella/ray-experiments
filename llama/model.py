@@ -45,9 +45,9 @@ class ModelArgs:
 
 LLAMA_DEBUG = ModelArgs(
     dim=1024,  # 1/2
-    n_layers=8,
-    n_heads=16,
-    n_kv_heads=4,
+    n_layers=16,
+    n_heads=32,
+    n_kv_heads=8,
     vocab_size=128256,
     multiple_of=256,
     ffn_dim_multiplier=1.5,
@@ -345,12 +345,13 @@ class TransformerBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, device, params: ModelArgs):
+    def __init__(self, device, params: ModelArgs, stg1_layers: int):
         super().__init__()
         self.device = device
         self.params = params
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
+        self.stg1_layers = stg1_layers
 
         self.fwd_time = 0
         self.events: Dict[str, Any] = {}
@@ -508,13 +509,13 @@ class Transformer(nn.Module):
                 [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
             ).type_as(h)
 
-        for layer in self.layers[:len(self.layers)//2]:
+        for layer in self.layers[:self.stg1_layers]:
             h = layer(h, start_pos, freqs_cis, mask)
 
         self.update_tracing("stg1.ends")
         self.update_tracing("stg2.starts")
 
-        for layer in self.layers[len(self.layers)//2:]:
+        for layer in self.layers[self.stg1_layers:]:
             h = layer(h, start_pos, freqs_cis, mask)
         h = self.norm(h) if self.norm else h
         output = self.output(h).float() if self.output else h

@@ -3,7 +3,6 @@
 
 import logging
 import math
-import time
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
@@ -13,8 +12,6 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn.utils import parameters_to_vector
-
-from torch.profiler import profile, record_function, ProfilerActivity
 
 # import fairscale.nn.model_parallel.initialize as fs_init
 # from fairscale.nn.model_parallel.layers import (
@@ -44,11 +41,11 @@ class ModelArgs:
 
 
 LLAMA_DEBUG = ModelArgs(
-    dim=1024,  # 1/2
-    n_layers=15,
-    n_heads=16,
-    n_kv_heads=4,
-    vocab_size=128256,
+    dim=128,  # 1/2
+    n_layers=8,
+    n_heads=4,
+    n_kv_heads=2,
+    vocab_size=3200,
     multiple_of=256,
     ffn_dim_multiplier=1.5,
     norm_eps=1e-5,
@@ -101,6 +98,23 @@ LLAMA_8B = ModelArgs(
     max_seq_len=2048,
 )
 
+class EmbeddingBlock(torch.nn.Module):
+    def __init__(self, vocab_size: int, dim: int):
+        super().__init__()
+        self.layer = torch.nn.Embedding(vocab_size, dim)
+
+    def forward(self, tokens):
+        return self.layer(tokens)
+
+
+class OutputLayer(torch.nn.Module):
+    def __init__(self, dim: int, vocab_size: int, bias=False):
+        super().__init__()
+        self.layer = torch.nn.Linear(dim, vocab_size, bias)
+    
+    def forward(self, h):
+        return self.layer(h)
+
 
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
@@ -116,12 +130,34 @@ class RMSNorm(torch.nn.Module):
         return output * self.weight
 
 
-def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
-    freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
-    t = torch.arange(end, device=freqs.device, dtype=torch.float32)
-    freqs = torch.outer(t, freqs)
-    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
-    return freqs_cis
+class FreqsCis(torch.nn.Module):
+    def __init__(self, dim: int, end: int, theta: float = 10000.0, device=None):
+        super().__init__()
+        freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
+        t = torch.arange(end, device=freqs.device, dtype=torch.float32)
+        freqs = torch.outer(t, freqs)
+        self.freqs_cis = torch.polar(torch.ones_like(freqs), freqs).to(device)  # complex64
+        self.device = device
+
+    def forward(self, h: torch.Tensor, seqlen: int):
+        start_pos = 0
+        freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]
+
+        mask = None
+        if seqlen > 1:
+            mask = torch.full((seqlen, seqlen), float("-inf"), device=self.device)
+
+            mask = torch.triu(mask, diagonal=1)
+
+            # When performing key-value caching, we compute the attention scores
+            # only for the new sequence. Thus, the matrix of scores is of size
+            # (seqlen, cache_len + seqlen), and the only masked entries are (i, j) for
+            # j > cache_len + i, since row i corresponds to token cache_len + i.
+            mask = torch.hstack(
+                [torch.zeros((seqlen, start_pos), device=self.device), mask]
+            ).type_as(h)
+
+        return h, freqs_cis, mask
 
 
 def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
@@ -341,21 +377,14 @@ class TransformerBlock(nn.Module):
     ):
         h = x + self.attention(self.attention_norm(x), start_pos, freqs_cis, mask)
         out = h + self.feed_forward(self.ffn_norm(h))
-        return out
-
+        return out, freqs_cis, mask
 
 class Transformer(nn.Module):
-    def __init__(self, rank, layers_per_rank, device, params: ModelArgs):
+    def __init__(self, params: ModelArgs):
         super().__init__()
-        self.rank = rank
-        self.device = device
         self.params = params
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
-
-        self.fwd_time = 0
-        self.events: Dict[str, Any] = {}
-        self.elapses: Dict[str, List] = defaultdict(list)
 
         # buckets = [
         #     "VocabParallelEmbedding",
@@ -380,125 +409,40 @@ class Transformer(nn.Module):
                 log_size(child, indent + 1)
 
         # self.tok_embeddings = VocabParallelEmbedding(
-        self.tok_embeddings = torch.nn.Embedding(
+        self.tok_embeddings = EmbeddingBlock(
             params.vocab_size,
-            params.dim,
-            # init_method=lambda x: x,
+            params.dim
         )
-        log_size(self.tok_embeddings)
+        log_size(self.tok_embeddings.layer)
+
+        self.freqs_cis = FreqsCis(
+            params.dim // params.n_heads,
+            params.max_seq_len * 2,
+            params.rope_theta,
+            device,
+        )
 
         self.layers = torch.nn.ModuleList()
-        for layer_id in range(layers_per_rank):
+        for layer_id in range(params.n_layers):
             self.layers.append(TransformerBlock(layer_id, params))
         log_size(self.layers[0])
 
         self.norm = RMSNorm(params.dim, eps=params.norm_eps)
         log_size(self.norm)
-        # self.output = ColumnParallelLinear(
-        self.output = torch.nn.Linear(
+        
+        self.output = OutputLayer(
             params.dim,
             params.vocab_size,
             bias=False,
-            # init_method=lambda x: x,
         )
         log_size(self.output)
 
-        self.freqs_cis = precompute_freqs_cis(
-            params.dim // params.n_heads,
-            params.max_seq_len * 2,
-            params.rope_theta,
-        ).to(device)
-
-    def init_tracing(self):
-    #   self.num_batches_forwarded = 0
-    #   self.num_batches_updated = 0
-      self.events: Dict[str, Any] = {
-          "start": [],
-          "end": [],
-          "fwd.starts": [],
-          "fwd.ends": [],
-          "bwd.starts": [],
-          "bwd.ends": [],
-          "upd.starts": [],
-          "upd.ends": [],
-      }
-      self.fwd_total = 0
-      self.fwd_cnt = 0
-      torch.cuda.synchronize()
-
-    def fetch_traces(self) -> Dict[str, List[float]]:
-        return self.elapses
-
-    def update_tracing(self, key: str):
-        event = torch.cuda.Event(enable_timing=True)
-        event.record()
-        assert key in self.events
-        self.events[key].append(event)
-
-    def finish_tracing(self) -> None:
-        torch.cuda.synchronize()
-
-        assert len(self.events["start"]) == 1
-        assert len(self.events["end"]) == 1
-
-        def millis_to_micros(millis: float) -> int:
-            return round(millis * 1e3)
-
-        total = self.events["start"][0].elapsed_time(self.events["end"][0])
-        fw_total = sum(
-            [
-                fw_start.elapsed_time(fw_end)
-                for fw_start, fw_end in zip(
-                    self.events["fwd.starts"],
-                    self.events["fwd.ends"],
-                )
-            ]
-        )
-        # print("fw elapses: ",             [
-        #         fw_start.elapsed_time(fw_end)
-        #         for fw_start, fw_end in zip(
-        #             self.events["fwd.starts"],
-        #             self.events["fwd.ends"],
-        #         )
-        #     ])
-        self.elapses["total"].append(millis_to_micros(total))
-        self.elapses["fwd_total"].append(millis_to_micros(fw_total))
-
-    def forward(self, tokens: torch.TensorType):
-        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True) as prof:
-        #     with record_function(f"Rank {self.rank}"):
-        # print(f"Rank {self.rank}", tokens.shape)
-        self.update_tracing("fwd.starts")
+    def forward(self, tokens: torch.Tensor):
         seqlen = tokens.shape[1]
         h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
-
-        # self.freqs_cis = self.freqs_cis.to(h.device)
-        start_pos = 0
-        freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]
-
-        mask = None
-        if seqlen > 1:
-            mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device)
-
-            mask = torch.triu(mask, diagonal=1)
-
-            # When performing key-value caching, we compute the attention scores
-            # only for the new sequence. Thus, the matrix of scores is of size
-            # (seqlen, cache_len + seqlen), and the only masked entries are (i, j) for
-            # j > cache_len + i, since row i corresponds to token cache_len + i.
-            mask = torch.hstack(
-                [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
-            ).type_as(h)
-
+        h, freqs_cis, mask = self.freqs_cis(h, seqlen)
         for layer in self.layers:
-            h = layer(h, start_pos, freqs_cis, mask)
+            h = layer(h, 0, freqs_cis, mask)
         h = self.norm(h) if self.norm else h
         output = self.output(h).float() if self.output else h
-
-        self.update_tracing("fwd.ends")
-        # torch.cuda.synchronize()
-        # time = (self.events['fwd.starts'][-1]).elapsed_time(self.events['fwd.ends'][-1])
-        # print(f"Rank {self.rank} fwd: {time}")
-        # print(f"Rank {self.rank}:\n", prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-        # prof.export_chrome_trace("results/mfris/" + f"trace_rank{self.rank}.json")
         return output

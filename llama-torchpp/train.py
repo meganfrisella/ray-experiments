@@ -29,9 +29,12 @@ def log_to_csv(output_path, timestamp, rank, elapses, warmup: float=0.2):
             w.writerow([key, round(mean), round(std), round(pct)])
 
 def train(rank, world_size, device, model_args, output_path, timestamp, batch_size=100, seq_len=10, num_iters=2, num_batches=10, num_microbatches=4):
+    assert world_size == 2
 
     # load model
     layers_per_rank = model_args.n_layers // world_size
+    if rank == 0: layers_per_rank += 1
+    if rank == 1: layers_per_rank -= 1
     model = Transformer(rank, layers_per_rank, device, model_args)
     print(f"[Rank {rank}] Loaded model")
 
@@ -107,6 +110,7 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
         # prof.export_chrome_trace(output_path + f"trace_rank{rank}_iter{iter}.json")
 
     elapses = model.fetch_traces()
+    print(f"Rank {rank}", elapses)
     log_to_csv(output_path, timestamp, rank, elapses)
 
     dist.barrier()

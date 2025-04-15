@@ -29,10 +29,10 @@ rm -f ${output_path}/*.json
 echo "Running $output_path..."
 
 stages=2
-batch_size=32
-seq_len=16
+batch_size=128
+seq_len=32
 num_microbatches=2
-num_iters=10
+num_iters=2
 model=LLAMA_DEBUG
 
 # RAY_CGRAPH_VISUALIZE_SCHEDULE=1 \
