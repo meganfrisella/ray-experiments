@@ -23,6 +23,7 @@ def log_to_csv(output_path, timestamp, rank, elapses, warmup: float=0.2):
         total_mean = np.mean(elapses["total"])
 
         for key, vals in elapses.items():
+            print(f"{key} last elapse: {vals[-1]}")
             mean = np.mean(vals)
             std = np.std(vals)
             pct = (mean / total_mean * 100)
@@ -34,11 +35,13 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     # load model
 
     layers_per_rank = model_args.n_layers // world_size
-    if rank == 0: int(model_args.n_layers * 5 / 8)
-    if rank == 1: model_args.n_layers - int(model_args.n_layers * 5 / 8)
+    stg1 = int(model_args.n_layers * 5 / 8)
+
+    if rank == 0: layers_per_rank = stg1
+    if rank == 1: layers_per_rank = model_args.n_layers - stg1
 
     model = Transformer(rank, layers_per_rank, device, model_args)
-    print(f"[Rank {rank}] Loaded model")
+    print(f"[Rank {rank}] Loaded model. Layers: {layers_per_rank}")
 
     # create pipeline
     if rank == 0:
@@ -66,6 +69,11 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     schedule = Schedule1F1B(stage, num_microbatches, loss_fn=criterion)
 
     # generate data
+    # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+    #     record_shapes=True, 
+    #     profile_memory=True,
+    #     with_stack=True) as prof:
+    #     with record_function(f"rank{rank}_test"):
     if rank == 0:
         input = torch.randint(
             0,
@@ -80,6 +88,7 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
         requires_grad=True,
         device=device,
     )
+    # prof.export_chrome_trace(f"rank{rank}_test.json")
 
     dist.barrier()
 

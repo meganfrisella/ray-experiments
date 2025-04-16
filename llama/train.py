@@ -12,7 +12,7 @@ from typing import Any, Dict
 # load model
 
 model_args = LLAMA_DEBUG
-batch_size = 128
+batch_size = 64
 seq_len = 32
 num_iters = 25
 
@@ -69,6 +69,7 @@ for key, vals in elapses.items():
 total_mean = np.mean(elapses["total"])
 
 for key, vals in elapses.items():
+    print(f"{key} last elapse: {vals[-1]}")
     mean = np.mean(vals)
     std = np.std(vals)
     pct = (mean / total_mean * 100)

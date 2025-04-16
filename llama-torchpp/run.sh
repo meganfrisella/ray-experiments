@@ -35,7 +35,7 @@ batch_size=128
 seq_len=32
 num_microbatches=2
 num_iters=25
-model=LLAMA_1B
+model=LLAMA_DEBUG
 
 # RAY_CGRAPH_VISUALIZE_SCHEDULE=1 \
 torchrun --nnodes 1 --nproc-per-node $nproc_per_node train.py \

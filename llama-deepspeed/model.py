@@ -3,6 +3,7 @@
 
 import logging
 import math
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
@@ -12,6 +13,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn.utils import parameters_to_vector
+
+from torch.profiler import profile, record_function, ProfilerActivity
 
 # import fairscale.nn.model_parallel.initialize as fs_init
 # from fairscale.nn.model_parallel.layers import (
@@ -41,11 +44,11 @@ class ModelArgs:
 
 
 LLAMA_DEBUG = ModelArgs(
-    dim=128,  # 1/2
-    n_layers=8,
-    n_heads=4,
-    n_kv_heads=2,
-    vocab_size=3200,
+    dim=512,  # 1/2
+    n_layers=16,
+    n_heads=32,
+    n_kv_heads=8,
+    vocab_size=128256,
     multiple_of=256,
     ffn_dim_multiplier=1.5,
     norm_eps=1e-5,
@@ -98,23 +101,6 @@ LLAMA_8B = ModelArgs(
     max_seq_len=2048,
 )
 
-class EmbeddingBlock(torch.nn.Module):
-    def __init__(self, vocab_size: int, dim: int):
-        super().__init__()
-        self.layer = torch.nn.Embedding(vocab_size, dim)
-
-    def forward(self, tokens):
-        return self.layer(tokens)
-
-
-class OutputLayer(torch.nn.Module):
-    def __init__(self, dim: int, vocab_size: int, bias=False):
-        super().__init__()
-        self.layer = torch.nn.Linear(dim, vocab_size, bias)
-    
-    def forward(self, h):
-        return self.layer(h)
-
 
 class RMSNorm(torch.nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
@@ -130,34 +116,12 @@ class RMSNorm(torch.nn.Module):
         return output * self.weight
 
 
-class FreqsCis(torch.nn.Module):
-    def __init__(self, dim: int, end: int, theta: float = 10000.0, device=None):
-        super().__init__()
-        freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
-        t = torch.arange(end, device=freqs.device, dtype=torch.float32)
-        freqs = torch.outer(t, freqs)
-        self.freqs_cis = torch.polar(torch.ones_like(freqs), freqs).to(device)  # complex64
-        self.device = device
-
-    def forward(self, h: torch.Tensor, seqlen: int):
-        start_pos = 0
-        freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]
-
-        mask = None
-        if seqlen > 1:
-            mask = torch.full((seqlen, seqlen), float("-inf"), device=self.device)
-
-            mask = torch.triu(mask, diagonal=1)
-
-            # When performing key-value caching, we compute the attention scores
-            # only for the new sequence. Thus, the matrix of scores is of size
-            # (seqlen, cache_len + seqlen), and the only masked entries are (i, j) for
-            # j > cache_len + i, since row i corresponds to token cache_len + i.
-            mask = torch.hstack(
-                [torch.zeros((seqlen, start_pos), device=self.device), mask]
-            ).type_as(h)
-
-        return h, freqs_cis, mask
+def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0):
+    freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
+    t = torch.arange(end, device=freqs.device, dtype=torch.float32)
+    freqs = torch.outer(t, freqs)
+    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)  # complex64
+    return freqs_cis
 
 
 def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor):
@@ -352,7 +316,7 @@ class FeedForward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, layer_id: int, args: ModelArgs):
+    def __init__(self, layer_id: int, freqs_cis: torch.Tensor, mask: Optional[torch.Tensor], args: ModelArgs):
         super().__init__()
         self.n_heads = args.n_heads
         self.dim = args.dim
@@ -367,82 +331,115 @@ class TransformerBlock(nn.Module):
         self.layer_id = layer_id
         self.attention_norm = RMSNorm(args.dim, eps=args.norm_eps)
         self.ffn_norm = RMSNorm(args.dim, eps=args.norm_eps)
+        self.freqs_cis = freqs_cis
+        self.mask = mask
 
     def forward(
         self,
         x: torch.Tensor,
-        start_pos: int,
-        freqs_cis: torch.Tensor,
-        mask: Optional[torch.Tensor],
     ):
-        h = x + self.attention(self.attention_norm(x), start_pos, freqs_cis, mask)
+        h = x + self.attention(self.attention_norm(x), 0, self.freqs_cis, self.mask)
         out = h + self.feed_forward(self.ffn_norm(h))
-        return out, freqs_cis, mask
+        return out
+
 
 class Transformer(nn.Module):
-    def __init__(self, params: ModelArgs):
+    def __init__(self, rank, seq_len, params: ModelArgs):
         super().__init__()
+        self.rank = rank
         self.params = params
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
 
-        # buckets = [
-        #     "VocabParallelEmbedding",
-        #     [
-        #         "Attention",
-        #         "FeedForward",
-        #         "RMSNorm * 2",
-        #     ],
-        #     "ColumnParallelLinear",
-        # ]
+        self.fwd_time = 0
+        self.events: Dict[str, Any] = {}
+        self.elapses: Dict[str, List] = defaultdict(list)
 
-        def log_size(layer, indent=0):
-            num_params = sum(p.numel() for p in layer.parameters())
-            size_mib = num_params * 4 / (1024 * 1024)
-            indent_str = "  " * indent
-            logger.info(
-                f"{indent_str}{layer.__class__.__name__}: {round(size_mib)} MiB"
-            )
-            if size_mib < 25:
-                return
-            for _, child in layer.named_children():
-                log_size(child, indent + 1)
-
-        # self.tok_embeddings = VocabParallelEmbedding(
-        self.tok_embeddings = EmbeddingBlock(
+        self.tok_embeddings = torch.nn.Embedding(
             params.vocab_size,
-            params.dim
+            params.dim,
+            # init_method=lambda x: x,
         )
-        log_size(self.tok_embeddings.layer)
 
-        self.freqs_cis = FreqsCis(
+        freqs_cis = precompute_freqs_cis(
             params.dim // params.n_heads,
-            params.max_seq_len * 2,
+            seq_len,
             params.rope_theta,
-            device,
         )
+
+        start_pos = 0
+        mask = None
+        if seq_len > 1:
+            mask = torch.full((seq_len, seq_len), float("-inf"))
+
+            mask = torch.triu(mask, diagonal=1)
+
+            # When performing key-value caching, we compute the attention scores
+            # only for the new sequence. Thus, the matrix of scores is of size
+            # (seq_len, cache_len + seq_len), and the only masked entries are (i, j) for
+            # j > cache_len + i, since row i corresponds to token cache_len + i.
+            mask = torch.hstack(
+                [torch.zeros((seq_len, start_pos)), mask]
+            )
 
         self.layers = torch.nn.ModuleList()
         for layer_id in range(params.n_layers):
-            self.layers.append(TransformerBlock(layer_id, params))
-        log_size(self.layers[0])
+            self.layers.append(TransformerBlock(layer_id, freqs_cis, mask, params))
 
         self.norm = RMSNorm(params.dim, eps=params.norm_eps)
-        log_size(self.norm)
         
-        self.output = OutputLayer(
+        self.output = torch.nn.Linear(
             params.dim,
             params.vocab_size,
             bias=False,
+            # init_method=lambda x: x,
         )
-        log_size(self.output)
 
-    def forward(self, tokens: torch.Tensor):
-        seqlen = tokens.shape[1]
-        h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
-        h, freqs_cis, mask = self.freqs_cis(h, seqlen)
-        for layer in self.layers:
-            h = layer(h, 0, freqs_cis, mask)
-        h = self.norm(h) if self.norm else h
-        output = self.output(h).float() if self.output else h
-        return output
+
+    def init_tracing(self):
+    #   self.num_batches_forwarded = 0
+    #   self.num_batches_updated = 0
+      self.events: Dict[str, Any] = {
+          "start": [],
+          "end": [],
+          "fwd.starts": [],
+          "fwd.ends": [],
+          "bwd.starts": [],
+          "bwd.ends": [],
+          "upd.starts": [],
+          "upd.ends": [],
+      }
+      self.fwd_total = 0
+      self.fwd_cnt = 0
+      torch.cuda.synchronize()
+
+    def fetch_traces(self) -> Dict[str, List[float]]:
+        return self.elapses
+
+    def update_tracing(self, key: str):
+        event = torch.cuda.Event(enable_timing=True)
+        event.record()
+        assert key in self.events
+        self.events[key].append(event)
+
+    def finish_tracing(self) -> None:
+        torch.cuda.synchronize()
+
+        assert len(self.events["start"]) == 1
+        assert len(self.events["end"]) == 1
+
+        def millis_to_micros(millis: float) -> int:
+            return round(millis * 1e3)
+
+        total = self.events["start"][0].elapsed_time(self.events["end"][0])
+        fw_total = sum(
+            [
+                fw_start.elapsed_time(fw_end)
+                for fw_start, fw_end in zip(
+                    self.events["fwd.starts"],
+                    self.events["fwd.ends"],
+                )
+            ]
+        )
+        self.elapses["total"].append(millis_to_micros(total))
+        self.elapses["fwd_total"].append(millis_to_micros(fw_total))

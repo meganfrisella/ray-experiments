@@ -44,10 +44,10 @@ class ModelArgs:
 
 
 LLAMA_DEBUG = ModelArgs(
-    dim=1024,  # 1/2
-    n_layers=15,
-    n_heads=16,
-    n_kv_heads=4,
+    dim=512,  # 1/2
+    n_layers=16,
+    n_heads=32,
+    n_kv_heads=8,
     vocab_size=128256,
     multiple_of=256,
     ffn_dim_multiplier=1.5,
@@ -454,51 +454,45 @@ class Transformer(nn.Module):
                 )
             ]
         )
-        # print("fw elapses: ",             [
-        #         fw_start.elapsed_time(fw_end)
-        #         for fw_start, fw_end in zip(
-        #             self.events["fwd.starts"],
-        #             self.events["fwd.ends"],
-        #         )
-        #     ])
         self.elapses["total"].append(millis_to_micros(total))
         self.elapses["fwd_total"].append(millis_to_micros(fw_total))
 
     def forward(self, tokens: torch.TensorType):
-        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True) as prof:
-        #     with record_function(f"Rank {self.rank}"):
-        # print(f"Rank {self.rank}", tokens.shape)
-        self.update_tracing("fwd.starts")
-        seqlen = tokens.shape[1]
-        h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
-        # self.freqs_cis = self.freqs_cis.to(h.device)
-        start_pos = 0
-        freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+             record_shapes=True, 
+             profile_memory=True,
+             with_stack=True) as prof:
+            with record_function("stg1"):
+                self.update_tracing("fwd.starts")
 
-        mask = None
-        if seqlen > 1:
-            mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device)
+                seqlen = tokens.shape[1]
+                h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
-            mask = torch.triu(mask, diagonal=1)
+                # self.freqs_cis = self.freqs_cis.to(h.device)
+                start_pos = 0
+                freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]
 
-            # When performing key-value caching, we compute the attention scores
-            # only for the new sequence. Thus, the matrix of scores is of size
-            # (seqlen, cache_len + seqlen), and the only masked entries are (i, j) for
-            # j > cache_len + i, since row i corresponds to token cache_len + i.
-            mask = torch.hstack(
-                [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
-            ).type_as(h)
+                mask = None
+                if seqlen > 1:
+                    mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device)
 
-        for layer in self.layers:
-            h = layer(h, start_pos, freqs_cis, mask)
-        h = self.norm(h) if self.norm else h
-        output = self.output(h).float() if self.output else h
+                    mask = torch.triu(mask, diagonal=1)
 
-        self.update_tracing("fwd.ends")
-        # torch.cuda.synchronize()
-        # time = (self.events['fwd.starts'][-1]).elapsed_time(self.events['fwd.ends'][-1])
-        # print(f"Rank {self.rank} fwd: {time}")
-        # print(f"Rank {self.rank}:\n", prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-        # prof.export_chrome_trace("results/mfris/" + f"trace_rank{self.rank}.json")
+                    # When performing key-value caching, we compute the attention scores
+                    # only for the new sequence. Thus, the matrix of scores is of size
+                    # (seqlen, cache_len + seqlen), and the only masked entries are (i, j) for
+                    # j > cache_len + i, since row i corresponds to token cache_len + i.
+                    mask = torch.hstack(
+                        [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
+                    ).type_as(h)
+
+                for layer in self.layers:
+                    h = layer(h, start_pos, freqs_cis, mask)
+                h = self.norm(h) if self.norm else h
+                output = self.output(h).float() if self.output else h
+
+                self.update_tracing("fwd.ends")
+        prof.export_chrome_trace(f"stg{self.rank+1}_dist.json")
+
         return output
