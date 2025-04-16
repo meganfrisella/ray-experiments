@@ -90,12 +90,12 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-6)
     for iter in range(num_iters):
         model.init_tracing()
-        model.update_tracing("start")
         with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
                 record_shapes=True, 
                 profile_memory=True,
                 with_stack=True) as prof:
             with record_function("distrib"):
+                model.update_tracing("start")
                 losses = []
                 y = target
                 if rank == 0:
@@ -110,10 +110,10 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
                 )
                 optimizer.step()
                 optimizer.zero_grad()
+                model.update_tracing("end")
         prof.export_chrome_trace(f"rank{rank}_distrib.json")
         # model.num_batches_updated += 1
         # if model.num_batches_updated == num_microbatches:
-        model.update_tracing("end")
         model.finish_tracing()
         # log_to_txt(output_path, timestamp, rank, prof.key_averages().table(sort_by="cuda_time_total"))
         # prof.export_chrome_trace(output_path + f"trace_rank{rank}_iter{iter}.json")

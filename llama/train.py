@@ -47,19 +47,19 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=1e-6)
 for iter in range(num_iters):
     if iter % 5 == 0: print(f"iter {iter}/{num_iters}")
     model.init_tracing()
-    model.update_tracing("start")
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
             record_shapes=True, 
             profile_memory=True,
             with_stack=True) as prof:
         with record_function("single"):
+            model.update_tracing("start")
             pred = model(input)
             loss = criterion(pred, target)
             optimizer.step()
             optimizer.zero_grad()
+            model.update_tracing("end")
     prof.export_chrome_trace("single.json")
 
-    model.update_tracing("end")
     model.finish_tracing()
     # log_to_txt(output_path, timestamp, rank, prof.key_averages().table(sort_by="cuda_time_total"))
     # prof.export_chrome_trace(output_path + f"trace_rank{rank}_iter{iter}.json")
