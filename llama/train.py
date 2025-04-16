@@ -48,13 +48,16 @@ for iter in range(num_iters):
     if iter % 5 == 0: print(f"iter {iter}/{num_iters}")
     model.init_tracing()
     model.update_tracing("start")
-    # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True) as prof:
-    #     with record_function(f"Rank {rank} iter {iter}"):
-    pred = model(input)
-    loss = criterion(pred, target)
-
-    optimizer.step()
-    optimizer.zero_grad()
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+            record_shapes=True, 
+            profile_memory=True,
+            with_stack=True) as prof:
+        with record_function("single"):
+            pred = model(input)
+            loss = criterion(pred, target)
+            optimizer.step()
+            optimizer.zero_grad()
+    prof.export_chrome_trace("single.json")
 
     model.update_tracing("end")
     model.finish_tracing()

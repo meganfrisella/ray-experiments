@@ -23,7 +23,7 @@ def log_to_csv(output_path, timestamp, rank, elapses, warmup: float=0.2):
         total_mean = np.mean(elapses["total"])
 
         for key, vals in elapses.items():
-            print(f"{key} last elapse: {vals[-1]}")
+            print(f"Rank {rank} {key} last elapse: {vals[-1]}")
             mean = np.mean(vals)
             std = np.std(vals)
             pct = (mean / total_mean * 100)
@@ -69,11 +69,6 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     schedule = Schedule1F1B(stage, num_microbatches, loss_fn=criterion)
 
     # generate data
-    # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-    #     record_shapes=True, 
-    #     profile_memory=True,
-    #     with_stack=True) as prof:
-    #     with record_function(f"rank{rank}_test"):
     if rank == 0:
         input = torch.randint(
             0,
@@ -88,7 +83,6 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
         requires_grad=True,
         device=device,
     )
-    # prof.export_chrome_trace(f"rank{rank}_test.json")
 
     dist.barrier()
 
@@ -97,22 +91,26 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     for iter in range(num_iters):
         model.init_tracing()
         model.update_tracing("start")
-        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True) as prof:
-        #     with record_function(f"Rank {rank} iter {iter}"):
-        losses = []
-        y = target
-        if rank == 0:
-            x = input
-            schedule.step(x, target=y, losses=losses)
-        else:
-            schedule.step(target=y, losses=losses)
-        loss = (
-            torch.mean(torch.stack(losses)).to(device)
-            if rank == world_size - 1
-            else torch.tensor([-1.0], device=device)
-        )
-        optimizer.step()
-        optimizer.zero_grad()
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+                record_shapes=True, 
+                profile_memory=True,
+                with_stack=True) as prof:
+            with record_function("distrib"):
+                losses = []
+                y = target
+                if rank == 0:
+                    x = input
+                    schedule.step(x, target=y, losses=losses)
+                else:
+                    schedule.step(target=y, losses=losses)
+                loss = (
+                    torch.mean(torch.stack(losses)).to(device)
+                    if rank == world_size - 1
+                    else torch.tensor([-1.0], device=device)
+                )
+                optimizer.step()
+                optimizer.zero_grad()
+        prof.export_chrome_trace(f"rank{rank}_distrib.json")
         # model.num_batches_updated += 1
         # if model.num_batches_updated == num_microbatches:
         model.update_tracing("end")

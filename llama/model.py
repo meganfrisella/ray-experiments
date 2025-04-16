@@ -487,50 +487,50 @@ class Transformer(nn.Module):
 
         self.update_tracing("fwd.starts")
 
-        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-             record_shapes=True, 
-             profile_memory=True,
-             with_stack=True) as prof1:
-            with record_function("stg1"):
-                self.update_tracing("stg1.starts")
-                seqlen = tokens.shape[1]
-                h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
+        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+        #      record_shapes=True, 
+        #      profile_memory=True,
+        #      with_stack=True) as prof1:
+        #     with record_function("stg1"):
+        self.update_tracing("stg1.starts")
+        seqlen = tokens.shape[1]
+        h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
-                # self.freqs_cis = self.freqs_cis.to(h.device)
-                start_pos = 0
-                freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]
+        # self.freqs_cis = self.freqs_cis.to(h.device)
+        start_pos = 0
+        freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]
 
-                mask = None
-                if seqlen > 1:
-                    mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device)
+        mask = None
+        if seqlen > 1:
+            mask = torch.full((seqlen, seqlen), float("-inf"), device=tokens.device)
 
-                    mask = torch.triu(mask, diagonal=1)
+            mask = torch.triu(mask, diagonal=1)
 
-                    # When performing key-value caching, we compute the attention scores
-                    # only for the new sequence. Thus, the matrix of scores is of size
-                    # (seqlen, cache_len + seqlen), and the only masked entries are (i, j) for
-                    # j > cache_len + i, since row i corresponds to token cache_len + i.
-                    mask = torch.hstack(
-                        [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
-                    ).type_as(h)
+            # When performing key-value caching, we compute the attention scores
+            # only for the new sequence. Thus, the matrix of scores is of size
+            # (seqlen, cache_len + seqlen), and the only masked entries are (i, j) for
+            # j > cache_len + i, since row i corresponds to token cache_len + i.
+            mask = torch.hstack(
+                [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
+            ).type_as(h)
 
-                for layer in self.layers[:self.stg1_layers]:
-                    h = layer(h, start_pos, freqs_cis, mask)
-                self.update_tracing("stg1.ends")
-        prof1.export_chrome_trace("stg1.json")
+        for layer in self.layers[:self.stg1_layers]:
+            h = layer(h, start_pos, freqs_cis, mask)
+        self.update_tracing("stg1.ends")
+        # prof1.export_chrome_trace("stg1.json")
 
-        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-             record_shapes=True, 
-             profile_memory=True,
-             with_stack=True) as prof2:
-            with record_function("stg2"):
-                self.update_tracing("stg2.starts")
-                for layer in self.layers[self.stg1_layers:]:
-                    h = layer(h, start_pos, freqs_cis, mask)
-                h = self.norm(h) if self.norm else h
-                output = self.output(h).float() if self.output else h
-                self.update_tracing("stg2.ends")
-        prof2.export_chrome_trace("stg2.json")
+        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+        #      record_shapes=True, 
+        #      profile_memory=True,
+        #      with_stack=True) as prof2:
+        #     with record_function("stg2"):
+        self.update_tracing("stg2.starts")
+        for layer in self.layers[self.stg1_layers:]:
+            h = layer(h, start_pos, freqs_cis, mask)
+        h = self.norm(h) if self.norm else h
+        output = self.output(h).float() if self.output else h
+        self.update_tracing("stg2.ends")
+        # prof2.export_chrome_trace("stg2.json")
         self.update_tracing("fwd.ends")
 
 
