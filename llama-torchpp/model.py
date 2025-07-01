@@ -445,6 +445,7 @@ class Transformer(nn.Module):
             return round(millis * 1e3)
 
         total = self.events["start"][0].elapsed_time(self.events["end"][0])
+        # print(f"num forward calls: {len(self.events['fwd.starts'])}")
         fw_total = sum(
             [
                 fw_start.elapsed_time(fw_end)
@@ -464,7 +465,7 @@ class Transformer(nn.Module):
         #      profile_memory=True,
         #      with_stack=True) as prof:
         #     with record_function("stg1"):
-        self.update_tracing("fwd.starts")
+        # self.update_tracing("fwd.starts")
 
         seqlen = tokens.shape[1]
         h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
@@ -492,7 +493,7 @@ class Transformer(nn.Module):
         h = self.norm(h) if self.norm else h
         output = self.output(h).float() if self.output else h
 
-        self.update_tracing("fwd.ends")
+        # self.update_tracing("fwd.ends")
         # prof.export_chrome_trace(f"stg{self.rank+1}_dist.json")
 
         return output

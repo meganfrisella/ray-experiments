@@ -4,7 +4,7 @@ import csv
 import numpy as np
 from torch import nn
 import torch.distributed as dist
-from torch.distributed.pipelining import pipeline, PipelineStage, SplitPoint, Schedule1F1B
+from torch.distributed.pipelining import pipeline, PipelineStage, SplitPoint, Schedule1F1B, ScheduleGPipe
 from torch.profiler import profile, record_function, ProfilerActivity
 from model import Transformer, LLAMA_1B, LLAMA_3B, LLAMA_8B, LLAMA_DEBUG
 from typing import Any, Dict
@@ -23,11 +23,24 @@ def log_to_csv(output_path, timestamp, rank, elapses, warmup: float=0.2):
         total_mean = np.mean(elapses["total"])
 
         for key, vals in elapses.items():
-            print(f"Rank {rank} {key} last elapse: {vals[-1]}")
+            # print(f"Rank {rank} {key} last elapse: {vals[-1]}")
             mean = np.mean(vals)
             std = np.std(vals)
             pct = (mean / total_mean * 100)
             w.writerow([key, round(mean), round(std), round(pct)])
+
+def step(rank, schedule, target, input, optimizer):
+    losses = []
+    y = target
+    if rank == 0:
+        x = input
+        schedule.step(x, target=y, losses=losses)
+    else:
+        schedule.step(target=y, losses=losses)
+    print(losses)
+    torch.cuda.synchronize()
+    optimizer.step()
+    optimizer.zero_grad()
 
 def train(rank, world_size, device, model_args, output_path, timestamp, batch_size=100, seq_len=10, num_iters=2, num_batches=10, num_microbatches=4):
     assert world_size == 2
@@ -35,13 +48,12 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     # load model
 
     layers_per_rank = model_args.n_layers // world_size
-    stg1 = int(model_args.n_layers * 5 / 8)
+    # stg1 = int(model_args.n_layers * 5 / 8)
 
-    if rank == 0: layers_per_rank = stg1
-    if rank == 1: layers_per_rank = model_args.n_layers - stg1
+    # if rank == 0: layers_per_rank = stg1
+    # if rank == 1: layers_per_rank = model_args.n_layers - stg1
 
     model = Transformer(rank, layers_per_rank, device, model_args)
-    print(f"[Rank {rank}] Loaded model. Layers: {layers_per_rank}")
 
     # create pipeline
     if rank == 0:
@@ -62,13 +74,15 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
         # group=...,
     )
     model.to(device)
-    model.train()
+    print(f"[Rank {rank}] Loaded model. Layers: {layers_per_rank}")
+    # model.train()
 
     # pipeline schedule
     criterion = torch.nn.CrossEntropyLoss()
     schedule = Schedule1F1B(stage, num_microbatches, loss_fn=criterion)
 
     # generate data
+    input = None
     if rank == 0:
         input = torch.randint(
             0,
@@ -87,46 +101,48 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     dist.barrier()
 
     # train
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-6)
+    import time
+
+    optimizer = torch.optim.AdamW(model.parameters())
+
+    step(rank, schedule, target, input, optimizer)
+    exit()
+
+    warmup = 3
+    for _ in range(warmup):
+        step(rank, schedule, target, input, optimizer)
+
+    start = time.perf_counter()
     for iter in range(num_iters):
-        model.init_tracing()
-        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-                record_shapes=True, 
-                profile_memory=True,
-                with_stack=True) as prof:
-            with record_function("distrib"):
-                model.update_tracing("start")
-                losses = []
-                y = target
-                if rank == 0:
-                    x = input
-                    schedule.step(x, target=y, losses=losses)
-                else:
-                    schedule.step(target=y, losses=losses)
-                loss = (
-                    torch.mean(torch.stack(losses)).to(device)
-                    if rank == world_size - 1
-                    else torch.tensor([-1.0], device=device)
-                )
-                optimizer.step()
-                optimizer.zero_grad()
-                model.update_tracing("end")
-        prof.export_chrome_trace(f"rank{rank}_distrib.json")
+        # model.init_tracing()
+        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+        #         record_shapes=True, 
+        #         profile_memory=True,
+        #         with_stack=True) as prof:
+        #     with record_function("distrib"):
+        # model.update_tracing("start")
+        step(rank, schedule, target, input, optimizer)
+        # model.update_tracing("end")
+        # prof.export_chrome_trace(f"rank{rank}_distrib.json")
         # model.num_batches_updated += 1
         # if model.num_batches_updated == num_microbatches:
-        model.finish_tracing()
+        # model.finish_tracing()
         # log_to_txt(output_path, timestamp, rank, prof.key_averages().table(sort_by="cuda_time_total"))
         # prof.export_chrome_trace(output_path + f"trace_rank{rank}_iter{iter}.json")
+    end = time.perf_counter()
 
-    elapses = model.fetch_traces()
-    print(f"Rank {rank}", elapses)
-    log_to_csv(output_path, timestamp, rank, elapses)
+    # elapses = model.fetch_traces()
+    # log_to_csv(output_path, timestamp, rank, elapses)
+    print(
+        f"1f1b throughput: {(num_iters * batch_size * seq_len)/(end - start):.0f} tokens/sec"
+    )
 
     dist.barrier()
     dist.destroy_process_group()
 
 
 if __name__ == "__main__":
+    torch.manual_seed(0)
     rank = int(os.environ["RANK"])
     world_size = int(os.environ["WORLD_SIZE"])
     device = torch.device(f"cuda:{rank % torch.cuda.device_count()}")
