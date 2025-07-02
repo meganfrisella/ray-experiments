@@ -10,7 +10,7 @@ from model import Transformer, LLAMA_1B, LLAMA_3B, LLAMA_8B, LLAMA_DEBUG
 from typing import Any, Dict
 import time
 
-TEST_RANK = None
+TEST_RANK = 0
 model_args = LLAMA_3B
 batch_size = 256
 seq_len = 32
@@ -123,7 +123,7 @@ for iter in range(num_iters):
     bwd_end = time.perf_counter()
     bwd_times.append((bwd_end-bwd_start)*1000)
 
-    # prof.export_chrome_trace(f"backward_single_torch.json")
+    # prof.export_chrome_trace(f"backward.json")
 
 print(
     f"fwd time: {np.mean(fwd_times)} ms"

@@ -115,26 +115,28 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
     start = time.perf_counter()
     for iter in range(num_iters):
         # model.init_tracing()
-        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-        #         record_shapes=True, 
-        #         profile_memory=True,
-        #         with_stack=True) as prof:
-        #     with record_function("distrib"):
-        # model.update_tracing("start")
-        step(rank, schedule, target, input, optimizer)
-        # model.update_tracing("end")
-        # prof.export_chrome_trace(f"rank{rank}_distrib.json")
-        # model.num_batches_updated += 1
-        # if model.num_batches_updated == num_microbatches:
-        # model.finish_tracing()
-        # log_to_txt(output_path, timestamp, rank, prof.key_averages().table(sort_by="cuda_time_total"))
-        # prof.export_chrome_trace(output_path + f"trace_rank{rank}_iter{iter}.json")
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+                record_shapes=True, 
+                profile_memory=True,
+                with_stack=True) as prof:
+            # model.update_tracing("start")
+            step(rank, schedule, target, input, optimizer)
+            # model.update_tracing("end")
+            # prof.export_chrome_trace(f"rank{rank}_distrib.json")
+            # model.num_batches_updated += 1
+            # if model.num_batches_updated == num_microbatches:
+            # model.finish_tracing()
+            # log_to_txt(output_path, timestamp, rank, prof.key_averages().table(sort_by="cuda_time_total"))
+        prof.export_chrome_trace(f"rank{rank}_step.json")
     end = time.perf_counter()
 
     # elapses = model.fetch_traces()
     # log_to_csv(output_path, timestamp, rank, elapses)
     print(
         f"1f1b throughput: {(num_iters * batch_size * seq_len)/(end - start):.0f} tokens/sec"
+    )
+    print(
+        f"1f1b time: {(end - start)*1000/num_iters:.0f} ms"
     )
 
     dist.barrier()
