@@ -342,6 +342,37 @@ class TransformerBlock(nn.Module):
         out = h + self.feed_forward(self.ffn_norm(h))
         return out
 
+class TimingWrapper(nn.Module):
+    def __init__(self, rank, mod: nn.Module):
+        super().__init__()
+        self.mod = mod
+        self.rank = rank
+
+    def init_tracing(self):
+      self.events = { "start": [], "end": []}
+
+    def update_tracing(self, key: str):
+        event = torch.cuda.Event(enable_timing=True)
+        event.record()
+        assert key in self.events
+        self.events[key].append(event)
+    
+    def finish_tracing(self):
+        mod_total = sum([
+            start.elapsed_time(end)
+            for start, end in zip(
+                self.events["start"],
+                self.events["end"],
+            )
+        ])
+        # print(f"rank {self.rank} layer time: {mod_total}")
+        return mod_total
+
+    def forward(self, *args):
+        self.update_tracing("start")
+        out = self.mod(*args)
+        self.update_tracing("end")
+        return out
 
 class Transformer(nn.Module):
     def __init__(self, rank, seq_len, params: ModelArgs):
@@ -355,6 +386,11 @@ class Transformer(nn.Module):
         self.events: Dict[str, Any] = {}
         self.elapses: Dict[str, List] = defaultdict(list)
 
+        # self.tok_embeddings = TimingWrapper(rank, torch.nn.Embedding(
+        #     params.vocab_size,
+        #     params.dim,
+        #     # init_method=lambda x: x,
+        # ))
         self.tok_embeddings = torch.nn.Embedding(
             params.vocab_size,
             params.dim,
@@ -384,10 +420,18 @@ class Transformer(nn.Module):
 
         self.layers = torch.nn.ModuleList()
         for layer_id in range(params.n_layers):
+            # self.layers.append(TimingWrapper(rank, TransformerBlock(layer_id, freqs_cis, mask, params)))
             self.layers.append(TransformerBlock(layer_id, freqs_cis, mask, params))
 
+        # self.norm = TimingWrapper(rank, RMSNorm(params.dim, eps=params.norm_eps))
         self.norm = RMSNorm(params.dim, eps=params.norm_eps)
-        
+
+        # self.output = TimingWrapper(rank, torch.nn.Linear(
+        #     params.dim,
+        #     params.vocab_size,
+        #     bias=False,
+        #     # init_method=lambda x: x,
+        # ))
         self.output = torch.nn.Linear(
             params.dim,
             params.vocab_size,
@@ -397,21 +441,14 @@ class Transformer(nn.Module):
 
 
     def init_tracing(self):
-    #   self.num_batches_forwarded = 0
-    #   self.num_batches_updated = 0
-      self.events: Dict[str, Any] = {
-          "start": [],
-          "end": [],
-          "fwd.starts": [],
-          "fwd.ends": [],
-          "bwd.starts": [],
-          "bwd.ends": [],
-          "upd.starts": [],
-          "upd.ends": [],
-      }
-      self.fwd_total = 0
-      self.fwd_cnt = 0
-      torch.cuda.synchronize()
+        self.events = { "start": [], "end": []}
+        self.tok_embeddings.init_tracing()
+        for layer in self.layers:
+            layer.init_tracing()
+        self.norm.init_tracing()
+        self.output.init_tracing()
+
+        torch.cuda.synchronize()
 
     def fetch_traces(self) -> Dict[str, List[float]]:
         return self.elapses
@@ -425,21 +462,21 @@ class Transformer(nn.Module):
     def finish_tracing(self) -> None:
         torch.cuda.synchronize()
 
+        fw_total = self.tok_embeddings.finish_tracing()
+        for layer in self.layers:
+            fw_total += layer.finish_tracing()
+        fw_total += self.norm.finish_tracing()
+        fw_total += self.output.finish_tracing()
+
         assert len(self.events["start"]) == 1
         assert len(self.events["end"]) == 1
+        total = self.events["start"][0].elapsed_time(self.events["end"][0])
 
         def millis_to_micros(millis: float) -> int:
             return round(millis * 1e3)
 
-        total = self.events["start"][0].elapsed_time(self.events["end"][0])
-        fw_total = sum(
-            [
-                fw_start.elapsed_time(fw_end)
-                for fw_start, fw_end in zip(
-                    self.events["fwd.starts"],
-                    self.events["fwd.ends"],
-                )
-            ]
-        )
+        # print(f"rank {self.rank} fw_total: {fw_total}")
+        # print(f"rank {self.rank} total: {total}")
+
         self.elapses["total"].append(millis_to_micros(total))
         self.elapses["fwd_total"].append(millis_to_micros(fw_total))

@@ -37,8 +37,8 @@ def step(rank, schedule, target, input, optimizer):
         schedule.step(x, target=y, losses=losses)
     else:
         schedule.step(target=y, losses=losses)
-    print(losses)
-    torch.cuda.synchronize()
+    #print(losses)
+    #torch.cuda.synchronize()
     optimizer.step()
     optimizer.zero_grad()
 
@@ -105,8 +105,8 @@ def train(rank, world_size, device, model_args, output_path, timestamp, batch_si
 
     optimizer = torch.optim.AdamW(model.parameters())
 
-    step(rank, schedule, target, input, optimizer)
-    exit()
+    # step(rank, schedule, target, input, optimizer)
+    # exit()
 
     warmup = 3
     for _ in range(warmup):

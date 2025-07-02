@@ -29,14 +29,18 @@ rm -f ${output_path}/*.json
 echo "Running $output_path..."
 
 stages=2
-batch_size=128
+batch_size=256
 seq_len=32
-num_microbatches=2
-num_iters=2
-model=LLAMA_DEBUG
+num_iters=10
 
 # RAY_CGRAPH_VISUALIZE_SCHEDULE=1 \
-deepspeed train.py --deepspeed_config=config.json -p $stages -s $num_iters -b $batch_size --seq-len $seq_len
+deepspeed train.py --deepspeed_config=config.json \
+	-p $stages \
+	-s $num_iters \
+	-b $batch_size \
+	--seq-len $seq_len \
+	-o $output_path \
+	-t $timestamp 
 	#>$log_file 2>&1
 # --save-model \
 status=$?

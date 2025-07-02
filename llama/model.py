@@ -345,13 +345,13 @@ class TransformerBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, device, params: ModelArgs, stg1_layers: int):
+    def __init__(self, rank, layers_per_rank, device, params: ModelArgs):
         super().__init__()
+        self.rank = rank
         self.device = device
         self.params = params
         self.vocab_size = params.vocab_size
         self.n_layers = params.n_layers
-        self.stg1_layers = stg1_layers
 
         self.fwd_time = 0
         self.events: Dict[str, Any] = {}
@@ -388,7 +388,7 @@ class Transformer(nn.Module):
         log_size(self.tok_embeddings)
 
         self.layers = torch.nn.ModuleList()
-        for layer_id in range(params.n_layers):
+        for layer_id in range(layers_per_rank):
             self.layers.append(TransformerBlock(layer_id, params))
         log_size(self.layers[0])
 
@@ -417,10 +417,6 @@ class Transformer(nn.Module):
           "end": [],
           "fwd.starts": [],
           "fwd.ends": [],
-          "stg1.starts": [],
-          "stg1.ends": [],
-          "stg2.starts": [],
-          "stg2.ends": [],
           "bwd.starts": [],
           "bwd.ends": [],
           "upd.starts": [],
@@ -458,41 +454,33 @@ class Transformer(nn.Module):
                 )
             ]
         )
-        stg1_total = sum(
+        bw_total = sum(
             [
-                fw_start.elapsed_time(fw_end)
-                for fw_start, fw_end in zip(
-                    self.events["stg1.starts"],
-                    self.events["stg1.ends"],
+                bw_start.elapsed_time(bw_end)
+                for bw_start, bw_end in zip(
+                    self.events["bwd.starts"],
+                    self.events["bwd.ends"],
                 )
             ]
         )
-        stg2_total = sum(
+        up_total = sum(
             [
-                fw_start.elapsed_time(fw_end)
-                for fw_start, fw_end in zip(
-                    self.events["stg2.starts"],
-                    self.events["stg2.ends"],
+                up_start.elapsed_time(up_end)
+                for up_start, up_end in zip(
+                    self.events["upd.starts"],
+                    self.events["upd.ends"],
                 )
             ]
         )
-        # check the time between forward calls
-
         self.elapses["total"].append(millis_to_micros(total))
         self.elapses["fwd_total"].append(millis_to_micros(fw_total))
-        self.elapses["stg1_total"].append(millis_to_micros(stg1_total))
-        self.elapses["stg2_total"].append(millis_to_micros(stg2_total))
+        self.elapses["bwd_total"].append(millis_to_micros(bw_total))
+        self.elapses["upd_total"].append(millis_to_micros(up_total))
 
     def forward(self, tokens: torch.TensorType):
 
-        self.update_tracing("fwd.starts")
+        # self.update_tracing("fwd.starts")
 
-        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-        #      record_shapes=True, 
-        #      profile_memory=True,
-        #      with_stack=True) as prof1:
-        #     with record_function("stg1"):
-        self.update_tracing("stg1.starts")
         seqlen = tokens.shape[1]
         h = self.tok_embeddings(tokens) if self.tok_embeddings else tokens
 
@@ -514,24 +502,11 @@ class Transformer(nn.Module):
                 [torch.zeros((seqlen, start_pos), device=tokens.device), mask]
             ).type_as(h)
 
-        for layer in self.layers[:self.stg1_layers]:
-            h = layer(h, start_pos, freqs_cis, mask)
-        self.update_tracing("stg1.ends")
-        # prof1.export_chrome_trace("stg1.json")
-
-        # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-        #      record_shapes=True, 
-        #      profile_memory=True,
-        #      with_stack=True) as prof2:
-        #     with record_function("stg2"):
-        self.update_tracing("stg2.starts")
-        for layer in self.layers[self.stg1_layers:]:
+        for layer in self.layers:
             h = layer(h, start_pos, freqs_cis, mask)
         h = self.norm(h) if self.norm else h
         output = self.output(h).float() if self.output else h
-        self.update_tracing("stg2.ends")
-        # prof2.export_chrome_trace("stg2.json")
-        self.update_tracing("fwd.ends")
 
+        # self.update_tracing("fwd.ends")
 
         return output
