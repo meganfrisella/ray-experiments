@@ -1,0 +1,200 @@
+W0712 11:39:22.934000 1980052 site-packages/torch/distributed/run.py:766] 
+W0712 11:39:22.934000 1980052 site-packages/torch/distributed/run.py:766] *****************************************
+W0712 11:39:22.934000 1980052 site-packages/torch/distributed/run.py:766] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0712 11:39:22.934000 1980052 site-packages/torch/distributed/run.py:766] *****************************************
+device count 3
+device count 3
+device count 3
+[Rank 1] Device: cuda:1
+[rank1]:V0712 11:39:28.222000 1980857 site-packages/torch/distributed/pipelining/stage.py:1326] Finished pipeline stage init, self.stage_index=1, self.is_first=False, self.is_last=False, self.num_stages=3,  running shape-inference at runtime
+[Rank 2] Device: cuda:2
+[Rank 0] Device: cuda:0
+[Rank 1] Loaded
+[rank1]:I0712 11:39:28.799000 1980857 site-packages/torch/distributed/pipelining/schedules.py:251] Using ScheduleGPipe
+[rank2]:V0712 11:39:28.810000 1980858 site-packages/torch/distributed/pipelining/stage.py:1326] Finished pipeline stage init, self.stage_index=2, self.is_first=False, self.is_last=True, self.num_stages=3,  running shape-inference at runtime
+[rank0]:V0712 11:39:28.939000 1980856 site-packages/torch/distributed/pipelining/stage.py:1326] Finished pipeline stage init, self.stage_index=0, self.is_first=True, self.is_last=False, self.num_stages=3,  running shape-inference at runtime
+[Rank 2] Loaded
+[rank2]:I0712 11:39:29.453000 1980858 site-packages/torch/distributed/pipelining/schedules.py:251] Using ScheduleGPipe
+[rank1]:[W712 11:39:29.313886240 ProcessGroupNCCL.cpp:4715] [PG ID 0 PG GUID 0 Rank 1]  using GPU 1 as device used by this process is currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. You can pecify device_id in init_process_group() to force use of a particular device.
+[Rank 0] Loaded
+[rank0]:I0712 11:39:29.610000 1980856 site-packages/torch/distributed/pipelining/schedules.py:251] Using ScheduleGPipe
+[rank0]:[W712 11:39:29.473244323 ProcessGroupNCCL.cpp:4715] [PG ID 0 PG GUID 0 Rank 0]  using GPU 0 as device used by this process is currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. You can pecify device_id in init_process_group() to force use of a particular device.
+[rank2]:[W712 11:39:29.563385883 ProcessGroupNCCL.cpp:4715] [PG ID 0 PG GUID 0 Rank 2]  using GPU 2 as device used by this process is currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. You can pecify device_id in init_process_group() to force use of a particular device.
+/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py:77: UserWarning: Anomaly Detection has been enabled. This mode will increase the runtime and should only be enabled for debugging.
+  with torch.autograd.detect_anomaly():
+/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py:77: UserWarning: Anomaly Detection has been enabled. This mode will increase the runtime and should only be enabled for debugging.
+  with torch.autograd.detect_anomaly():
+[rank2]:V0712 11:39:31.355000 1980858 site-packages/torch/distributed/pipelining/stage.py:1354] Shape inference: stage 2 receiving from stage 1
+[rank0]:V0712 11:39:31.355000 1980856 site-packages/torch/distributed/pipelining/stage.py:1344] Shape inference: stage 0 skipping recv, because shape info passed in via `args`
+[rank1]:V0712 11:39:31.356000 1980857 site-packages/torch/distributed/pipelining/stage.py:1354] Shape inference: stage 1 receiving from stage 0
+[rank0]:V0712 11:39:31.683000 1980856 site-packages/torch/distributed/pipelining/stage.py:1392] Shape inference: stage 0 inputs (tensor(..., device='meta', size=(64, 3, 224, 224)), tensor(..., device='meta', size=(64, 32), dtype=torch.int64)), outputs (tensor(..., device='meta', size=(64, 512)), tensor(..., device='meta', size=(64, 32)))
+[rank0]:V0712 11:39:31.685000 1980856 site-packages/torch/distributed/pipelining/stage.py:1419] Shape inference: stage 0 sending to stage 1
+[rank0]:V0712 11:39:32.049000 1980856 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 0] Forwarded chunk 0, outputs: ('Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)', 'Tensor(torch.Size([64, 32]), grad=False, dtype=torch.float32)')
+[rank0]:V0712 11:39:32.050000 1980856 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 0] Sending tensor to Stage 1: torch.Size([64, 512])
+[rank0]:V0712 11:39:32.051000 1980856 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 0] Sending tensor to Stage 1: torch.Size([64, 32])
+[rank0]:V0712 11:39:32.052000 1980856 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_send, [P2POp(isend pg=0, group_src=0, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=0, group_dst=1,  torch.Size([64, 32]), torch.float32)]
+DEBUG None
+[rank1]:V0712 11:39:32.297000 1980857 site-packages/torch/distributed/pipelining/stage.py:1392] Shape inference: stage 1 inputs (tensor(..., device='meta', size=(64, 512)), tensor(..., device='meta', size=(64, 32))), outputs (tensor(..., device='meta', size=(64, 512)), tensor(..., device='meta', size=(64, 512)))
+[rank1]:V0712 11:39:32.300000 1980857 site-packages/torch/distributed/pipelining/stage.py:1419] Shape inference: stage 1 sending to stage 2
+[rank1]:V0712 11:39:32.555000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=0, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=0, group_dst=1,  torch.Size([64, 32]), torch.float32)]
+[rank2]:V0712 11:39:32.753000 1980858 site-packages/torch/distributed/pipelining/stage.py:1392] Shape inference: stage 2 inputs (tensor(..., device='meta', size=(64, 512)), tensor(..., device='meta', size=(64, 512))), outputs (tensor(..., device='meta', size=(64, 64)),)
+[rank2]:V0712 11:39:32.756000 1980858 site-packages/torch/distributed/pipelining/stage.py:1412] Shape inference: stage 2 skipping send to next stage
+[rank0]:V0712 11:39:32.756000 1980856 site-packages/torch/distributed/pipelining/schedules.py:614] [0] Forwarded microbatch 0
+[rank2]:V0712 11:39:32.757000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+[rank0]:V0712 11:39:32.764000 1980856 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 0] Forwarded chunk 1, outputs: ('Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)', 'Tensor(torch.Size([64, 32]), grad=False, dtype=torch.float32)')
+[rank0]:V0712 11:39:32.765000 1980856 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 0] Sending tensor to Stage 1: torch.Size([64, 512])
+[rank0]:V0712 11:39:32.766000 1980856 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 0] Sending tensor to Stage 1: torch.Size([64, 32])
+[rank0]:V0712 11:39:32.767000 1980856 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_send, [P2POp(isend pg=0, group_src=0, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=0, group_dst=1,  torch.Size([64, 32]), torch.float32)]
+[rank0]:V0712 11:39:32.768000 1980856 site-packages/torch/distributed/pipelining/schedules.py:614] [0] Forwarded microbatch 1
+[rank0]:V0712 11:39:32.774000 1980856 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 0] Forwarded chunk 2, outputs: ('Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)', 'Tensor(torch.Size([64, 32]), grad=False, dtype=torch.float32)')
+[rank0]:V0712 11:39:32.775000 1980856 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 0] Sending tensor to Stage 1: torch.Size([64, 512])
+[rank0]:V0712 11:39:32.775000 1980856 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 0] Sending tensor to Stage 1: torch.Size([64, 32])
+[rank0]:V0712 11:39:32.776000 1980856 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_send, [P2POp(isend pg=0, group_src=0, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=0, group_dst=1,  torch.Size([64, 32]), torch.float32)]
+[rank0]:V0712 11:39:32.777000 1980856 site-packages/torch/distributed/pipelining/schedules.py:614] [0] Forwarded microbatch 2
+[rank0]:V0712 11:39:32.782000 1980856 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 0] Forwarded chunk 3, outputs: ('Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)', 'Tensor(torch.Size([64, 32]), grad=False, dtype=torch.float32)')
+[rank0]:V0712 11:39:32.783000 1980856 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 0] Sending tensor to Stage 1: torch.Size([64, 512])
+[rank0]:V0712 11:39:32.784000 1980856 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 0] Sending tensor to Stage 1: torch.Size([64, 32])
+[rank0]:V0712 11:39:32.784000 1980856 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_send, [P2POp(isend pg=0, group_src=0, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=0, group_dst=1,  torch.Size([64, 32]), torch.float32)]
+[rank0]:V0712 11:39:32.785000 1980856 site-packages/torch/distributed/pipelining/schedules.py:614] [0] Forwarded microbatch 3
+[rank0]:V0712 11:39:32.786000 1980856 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p bwd_recv, [P2POp(irecv pg=0, group_src=1, group_dst=0,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=1, group_dst=0,  torch.Size([64, 32]), torch.float32)]
+DEBUG <MulBackward0 object at 0x7f2e735fef20>
+[rank1]:V0712 11:39:32.822000 1980857 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 1] Forwarded chunk 0, outputs: ('Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)', 'Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)')
+[rank1]:V0712 11:39:32.823000 1980857 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 1] Sending tensor to Stage 2: torch.Size([64, 512])
+[rank1]:V0712 11:39:32.823000 1980857 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 1] Sending tensor to Stage 2: torch.Size([64, 512])
+[rank1]:V0712 11:39:32.824000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_send, [P2POp(isend pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+[rank1]:V0712 11:39:33.093000 1980857 site-packages/torch/distributed/pipelining/schedules.py:614] [1] Forwarded microbatch 0
+[rank1]:V0712 11:39:33.094000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=0, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=0, group_dst=1,  torch.Size([64, 32]), torch.float32)]
+[rank2]:V0712 11:39:33.097000 1980858 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 2] Forwarded chunk 0, outputs: Tensor(torch.Size([64, 64]), grad=True, dtype=torch.float32)
+[rank2]:V0712 11:39:33.098000 1980858 site-packages/torch/distributed/pipelining/schedules.py:614] [2] Forwarded microbatch 0
+DEBUG <MulBackward0 object at 0x7f2e735fed40>
+[rank1]:V0712 11:39:33.145000 1980857 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 1] Forwarded chunk 1, outputs: ('Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)', 'Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)')
+[rank1]:V0712 11:39:33.146000 1980857 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 1] Sending tensor to Stage 2: torch.Size([64, 512])
+[rank1]:V0712 11:39:33.146000 1980857 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 1] Sending tensor to Stage 2: torch.Size([64, 512])
+[rank1]:V0712 11:39:33.147000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_send, [P2POp(isend pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+[rank1]:V0712 11:39:33.149000 1980857 site-packages/torch/distributed/pipelining/schedules.py:614] [1] Forwarded microbatch 1
+[rank1]:V0712 11:39:33.149000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=0, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=0, group_dst=1,  torch.Size([64, 32]), torch.float32)]
+2 loss DEBUG <MulBackward0 object at 0x7f2e735fee90>
+[rank1]:V0712 11:39:33.198000 1980857 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 1] Forwarded chunk 2, outputs: ('Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)', 'Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)')
+[rank1]:V0712 11:39:33.199000 1980857 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 1] Sending tensor to Stage 2: torch.Size([64, 512])
+[rank1]:V0712 11:39:33.200000 1980857 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 1] Sending tensor to Stage 2: torch.Size([64, 512])
+[rank1]:V0712 11:39:33.200000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_send, [P2POp(isend pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+[rank1]:V0712 11:39:33.202000 1980857 site-packages/torch/distributed/pipelining/schedules.py:614] [1] Forwarded microbatch 2
+[rank1]:V0712 11:39:33.203000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=0, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=0, group_dst=1,  torch.Size([64, 32]), torch.float32)]
+tensor(20.3705, device='cuda:2', grad_fn=<NllLossBackward0>) tensor(4.4872, device='cuda:2', grad_fn=<NllLossBackward0>)
+[rank2]:V0712 11:39:33.235000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+[rank2]:V0712 11:39:33.239000 1980858 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 2] Forwarded chunk 1, outputs: Tensor(torch.Size([64, 64]), grad=True, dtype=torch.float32)
+[rank2]:V0712 11:39:33.240000 1980858 site-packages/torch/distributed/pipelining/schedules.py:614] [2] Forwarded microbatch 1
+2 loss tensor(16.6163, device='cuda:2', grad_fn=<NllLossBackward0>) tensor(4.4948, device='cuda:2', grad_fn=<NllLossBackward0>)
+[rank2]:V0712 11:39:33.244000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+[rank2]:V0712 11:39:33.247000 1980858 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 2] Forwarded chunk 2, outputs: Tensor(torch.Size([64, 64]), grad=True, dtype=torch.float32)
+[rank2]:V0712 11:39:33.248000 1980858 site-packages/torch/distributed/pipelining/schedules.py:614] [2] Forwarded microbatch 2
+DEBUG <MulBackward0 object at 0x7f2e735fecb0>
+[rank1]:V0712 11:39:33.249000 1980857 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 1] Forwarded chunk 3, outputs: ('Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)', 'Tensor(torch.Size([64, 512]), grad=True, dtype=torch.float32)')
+[rank1]:V0712 11:39:33.250000 1980857 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 1] Sending tensor to Stage 2: torch.Size([64, 512])
+2 loss [rank1]:V0712 11:39:33.250000 1980857 site-packages/torch/distributed/pipelining/stage.py:448] [Stage 1] Sending tensor to Stage 2: torch.Size([64, 512])
+tensor(17.9063, device='cuda:2', grad_fn=<NllLossBackward0>)[rank1]:V0712 11:39:33.251000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_send, [P2POp(isend pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+ tensor(4.5336, device='cuda:2', grad_fn=<NllLossBackward0>)
+[rank1]:V0712 11:39:33.252000 1980857 site-packages/torch/distributed/pipelining/schedules.py:614] [1] Forwarded microbatch 3
+[rank2]:V0712 11:39:33.253000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+[rank1]:V0712 11:39:33.253000 1980857 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p bwd_recv, [P2POp(irecv pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32)]
+[rank2]:V0712 11:39:33.256000 1980858 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 2] Forwarded chunk 3, outputs: Tensor(torch.Size([64, 64]), grad=True, dtype=torch.float32)
+[rank2]:V0712 11:39:33.257000 1980858 site-packages/torch/distributed/pipelining/schedules.py:614] [2] Forwarded microbatch 3
+2 loss tensor(17.9221, device='cuda:2', grad_fn=<NllLossBackward0>) tensor(4.4750, device='cuda:2', grad_fn=<NllLossBackward0>)
+DEBUG GRAD [None]
+[rank2]:V0712 11:39:33.301000 1980858 site-packages/torch/distributed/pipelining/stage.py:849] [Stage 2] Backwarded chunk 0
+[rank2]:V0712 11:39:33.302000 1980858 site-packages/torch/distributed/pipelining/stage.py:280] [Stage 2] Grad send info: [1, 1]
+[rank2]:V0712 11:39:33.302000 1980858 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 2] Sending gradient to Stage 1: torch.Size([64, 512])
+[rank2]:V0712 11:39:33.303000 1980858 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 2] Sending gradient to Stage 1: torch.Size([64, 512])
+[rank2]:V0712 11:39:33.303000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p bwd_send, [P2POp(isend pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32)]
+[rank2]:V0712 11:39:33.471000 1980858 site-packages/torch/distributed/pipelining/schedules.py:649] [2] Backwarded microbatch 0
+DEBUG GRAD [None]
+[rank2]:V0712 11:39:33.474000 1980858 site-packages/torch/distributed/pipelining/stage.py:849] [Stage 2] Backwarded chunk 1
+[rank2]:V0712 11:39:33.475000 1980858 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 2] Sending gradient to Stage 1: torch.Size([64, 512])
+[rank2]:V0712 11:39:33.475000 1980858 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 2] Sending gradient to Stage 1: torch.Size([64, 512])
+[rank2]:V0712 11:39:33.476000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p bwd_send, [P2POp(isend pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32)]
+[rank2]:V0712 11:39:33.477000 1980858 site-packages/torch/distributed/pipelining/schedules.py:649] [2] Backwarded microbatch 1
+DEBUG GRAD [None]
+[rank2]:V0712 11:39:33.479000 1980858 site-packages/torch/distributed/pipelining/stage.py:849] [Stage 2] Backwarded chunk 2
+[rank2]:V0712 11:39:33.479000 1980858 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 2] Sending gradient to Stage 1: torch.Size([64, 512])
+[rank2]:V0712 11:39:33.480000 1980858 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 2] Sending gradient to Stage 1: torch.Size([64, 512])
+[rank2]:V0712 11:39:33.481000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p bwd_send, [P2POp(isend pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32)]
+[rank2]:V0712 11:39:33.481000 1980858 site-packages/torch/distributed/pipelining/schedules.py:649] [2] Backwarded microbatch 2
+DEBUG GRAD [None]
+[rank2]:V0712 11:39:33.483000 1980858 site-packages/torch/distributed/pipelining/stage.py:849] [Stage 2] Backwarded chunk 3
+[rank2]:V0712 11:39:33.484000 1980858 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 2] Sending gradient to Stage 1: torch.Size([64, 512])
+[rank2]:V0712 11:39:33.485000 1980858 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 2] Sending gradient to Stage 1: torch.Size([64, 512])
+[rank2]:V0712 11:39:33.485000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p bwd_send, [P2POp(isend pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32), P2POp(isend pg=0, group_src=2, group_dst=1,  torch.Size([64, 512]), torch.float32)]
+[rank2]:V0712 11:39:33.486000 1980858 site-packages/torch/distributed/pipelining/schedules.py:649] [2] Backwarded microbatch 3
+[rank2]:V0712 11:39:33.533000 1980858 site-packages/torch/distributed/pipelining/schedules.py:407] batch_p2p fwd_recv, [P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32), P2POp(irecv pg=0, group_src=1, group_dst=2,  torch.Size([64, 512]), torch.float32)]
+[rank2]:V0712 11:39:33.538000 1980858 site-packages/torch/distributed/pipelining/stage.py:733] [Stage 2] Forwarded chunk 0, outputs: Tensor(torch.Size([64, 64]), grad=True, dtype=torch.float32)
+[rank2]:V0712 11:39:33.538000 1980858 site-packages/torch/distributed/pipelining/schedules.py:614] [2] Forwarded microbatch 0
+DEBUG GRAD [tensor([[-0.0936, -0.1991, -0.0491,  ..., -0.0061,  0.0238, -0.2710],
+        [ 0.0859, -0.2149,  0.1531,  ...,  0.0295, -0.1403, -0.0235],
+        [ 0.0140, -0.1050, -0.0661,  ...,  0.0516, -0.0952, -0.0682],
+        ...,
+        [ 0.1946,  0.0269,  0.2583,  ...,  0.0234, -0.1197, -0.0867],
+        [ 0.1599, -0.0688,  0.0072,  ...,  0.0424, -0.0759,  0.0284],
+        [ 0.1350, -0.0512, -0.0748,  ...,  0.0836,  0.1343, -0.2184]],
+       device='cuda:1'), tensor([[-1.5192e-03, -7.6968e-02, -1.2291e-01,  ..., -4.3278e-02,
+          5.1564e-02,  8.2301e-02],
+        [ 7.6500e-03, -8.5688e-02, -1.0903e-01,  ..., -5.4070e-02,
+          9.6325e-02,  6.1315e-02],
+        [-2.5281e-03, -1.0832e-01, -1.3443e-01,  ..., -6.5390e-02,
+          5.8005e-02,  7.7434e-02],
+        ...,
+        [ 5.4857e-05, -9.8901e-02, -1.2180e-01,  ..., -3.7169e-02,
+          5.2886e-02,  4.1501e-02],
+        [-9.1959e-03, -1.1399e-01, -1.2080e-01,  ..., -6.0749e-02,
+          4.3822e-02,  8.9677e-02],
+        [ 1.6947e-03, -1.2108e-01, -1.0982e-01,  ..., -4.0581e-02,
+          6.5543e-02,  5.9328e-02]], device='cuda:1')]
+[rank1]:V0712 11:39:33.673000 1980857 site-packages/torch/distributed/pipelining/stage.py:849] [Stage 1] Backwarded chunk 0
+[rank1]:V0712 11:39:33.674000 1980857 site-packages/torch/distributed/pipelining/stage.py:280] [Stage 1] Grad send info: [0, 0]
+[rank1]:V0712 11:39:33.675000 1980857 site-packages/torch/distributed/pipelining/stage.py:485] [Stage 1] Sending gradient to Stage 0: torch.Size([64, 512])
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py", line 281, in <module>
+[rank1]:     train(
+[rank1]:   File "/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py", line 215, in train
+[rank1]:     step(rank, schedule, target, input, optimizer)
+[rank1]:   File "/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py", line 78, in step
+[rank1]:     schedule.step(target=target, losses=losses)
+[rank1]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/pipelining/schedules.py", line 512, in step
+[rank1]:     self._step_microbatches(args_split, kwargs_split, targets_split, losses)
+[rank1]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/pipelining/schedules.py", line 645, in _step_microbatches
+[rank1]:     ops = self._stage.get_bwd_send_ops(i)
+[rank1]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/pipelining/stage.py", line 500, in get_bwd_send_ops
+[rank1]:     raise RuntimeError(
+[rank1]: RuntimeError: [1] for chunk 0 has gradients None and is expecting to send gradients to stage 0
+W0712 11:39:36.590000 1980052 site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 1980856 closing signal SIGTERM
+W0712 11:39:36.591000 1980052 site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 1980858 closing signal SIGTERM
+E0712 11:39:37.575000 1980052 site-packages/torch/distributed/elastic/multiprocessing/api.py:874] failed (exitcode: 1) local_rank: 1 (pid: 1980857) of binary: /m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/bin/python3.10
+Traceback (most recent call last):
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
+    return f(*args, **kwargs)
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/run.py", line 892, in main
+    run(args)
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/run.py", line 883, in run
+    elastic_launch(
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 139, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 270, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+train.py FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2025-07-12_11:39:36
+  host      : coriander.cs.washington.edu
+  rank      : 1 (local_rank: 1)
+  exitcode  : 1 (pid: 1980857)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
+[0;31mER[0m

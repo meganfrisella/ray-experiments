@@ -1,0 +1,87 @@
+W0712 12:22:00.026000 2165742 site-packages/torch/distributed/run.py:766] 
+W0712 12:22:00.026000 2165742 site-packages/torch/distributed/run.py:766] *****************************************
+W0712 12:22:00.026000 2165742 site-packages/torch/distributed/run.py:766] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0712 12:22:00.026000 2165742 site-packages/torch/distributed/run.py:766] *****************************************
+device count 3
+device count 3
+device count 3
+[Rank 0] Device: cuda:0
+[Rank 2] Device: cuda:2
+[Rank 1] Device: cuda:1
+[rank0]:V0712 12:22:05.859000 2165747 site-packages/torch/distributed/pipelining/stage.py:1326] Finished pipeline stage init, self.stage_index=0, self.is_first=True, self.is_last=False, self.num_stages=3,  running shape-inference at runtime
+[rank2]:V0712 12:22:05.863000 2165749 site-packages/torch/distributed/pipelining/stage.py:1326] Finished pipeline stage init, self.stage_index=2, self.is_first=False, self.is_last=True, self.num_stages=3,  running shape-inference at runtime
+[rank1]:V0712 12:22:05.877000 2165748 site-packages/torch/distributed/pipelining/stage.py:1326] Finished pipeline stage init, self.stage_index=1, self.is_first=False, self.is_last=False, self.num_stages=3,  running shape-inference at runtime
+[Rank 2] Loaded
+[rank2]:I0712 12:22:06.517000 2165749 site-packages/torch/distributed/pipelining/schedules.py:251] Using ScheduleGPipe
+[Rank 0] Loaded
+[rank0]:I0712 12:22:06.519000 2165747 site-packages/torch/distributed/pipelining/schedules.py:251] Using ScheduleGPipe
+[Rank 1] Loaded
+[rank1]:I0712 12:22:06.543000 2165748 site-packages/torch/distributed/pipelining/schedules.py:251] Using ScheduleGPipe
+[rank0]:[W712 12:22:06.378317571 ProcessGroupNCCL.cpp:4715] [PG ID 0 PG GUID 0 Rank 0]  using GPU 0 as device used by this process is currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. You can pecify device_id in init_process_group() to force use of a particular device.
+[rank2]:[W712 12:22:06.802498371 ProcessGroupNCCL.cpp:4715] [PG ID 0 PG GUID 0 Rank 2]  using GPU 2 as device used by this process is currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. You can pecify device_id in init_process_group() to force use of a particular device.
+[rank1]:[W712 12:22:06.810953076 ProcessGroupNCCL.cpp:4715] [PG ID 0 PG GUID 0 Rank 1]  using GPU 1 as device used by this process is currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect. You can pecify device_id in init_process_group() to force use of a particular device.
+/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py:77: UserWarning: Anomaly Detection has been enabled. This mode will increase the runtime and should only be enabled for debugging.
+  with torch.autograd.detect_anomaly():
+/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py:77: UserWarning: Anomaly Detection has been enabled. This mode will increase the runtime and should only be enabled for debugging.
+  with torch.autograd.detect_anomaly():
+[rank2]:V0712 12:22:08.521000 2165749 site-packages/torch/distributed/pipelining/stage.py:1354] Shape inference: stage 2 receiving from stage 1
+[rank1]:V0712 12:22:08.521000 2165748 site-packages/torch/distributed/pipelining/stage.py:1354] Shape inference: stage 1 receiving from stage 0
+[rank0]:V0712 12:22:08.524000 2165747 site-packages/torch/distributed/pipelining/stage.py:1344] Shape inference: stage 0 skipping recv, because shape info passed in via `args`
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py", line 281, in <module>
+[rank0]:     train(
+[rank0]:   File "/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py", line 215, in train
+[rank0]:     step(rank, schedule, target, input, optimizer)
+[rank0]:   File "/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/train.py", line 74, in step
+[rank0]:     schedule.step(*input, target=y, losses=losses)
+[rank0]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/pipelining/schedules.py", line 512, in step
+[rank0]:     self._step_microbatches(args_split, kwargs_split, targets_split, losses)
+[rank0]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/pipelining/schedules.py", line 595, in _step_microbatches
+[rank0]:     self._initialize_stage(arg_mbs[0], kwarg_mbs[0])
+[rank0]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/pipelining/schedules.py", line 482, in _initialize_stage
+[rank0]:     self._stage._prepare_forward_infra(self._n_microbatches, args, kwargs)
+[rank0]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/pipelining/stage.py", line 1448, in _prepare_forward_infra
+[rank0]:     outputs = self._shape_inference(args, kwargs)
+[rank0]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/pipelining/stage.py", line 1380, in _shape_inference
+[rank0]:     outputs = self.submod(*args, **kwargs)
+[rank0]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+[rank0]:     return self._call_impl(*args, **kwargs)
+[rank0]:   File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+[rank0]:     return forward_call(*args, **kwargs)
+[rank0]:   File "/m-coriander/coriander/arvinj/ray-experiments/clip-torchpp/model.py", line 451, in forward
+[rank0]:     text.detach().clone().requires_grad_(True)            
+[rank0]: RuntimeError: only Tensors of floating point dtype can require gradients
+[rank0]:[W712 12:22:09.839410481 ProcessGroupNCCL.cpp:1476] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+W0712 12:22:10.880000 2165742 site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 2165748 closing signal SIGTERM
+W0712 12:22:10.881000 2165742 site-packages/torch/distributed/elastic/multiprocessing/api.py:900] Sending process 2165749 closing signal SIGTERM
+E0712 12:22:11.964000 2165742 site-packages/torch/distributed/elastic/multiprocessing/api.py:874] failed (exitcode: 1) local_rank: 0 (pid: 2165747) of binary: /m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/bin/python3.10
+Traceback (most recent call last):
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/bin/torchrun", line 8, in <module>
+    sys.exit(main())
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
+    return f(*args, **kwargs)
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/run.py", line 892, in main
+    run(args)
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/run.py", line 883, in run
+    elastic_launch(
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 139, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/m-coriander/coriander/arvinj/miniconda3/envs/ray-exp/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 270, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+train.py FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2025-07-12_12:22:10
+  host      : coriander.cs.washington.edu
+  rank      : 0 (local_rank: 0)
+  exitcode  : 1 (pid: 2165747)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================
+[0;31mER[0m
